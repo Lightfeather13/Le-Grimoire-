@@ -16,8 +16,8 @@ class GameState():
         self.moveLog = []
         self.whiteKingLocation = (7, 4)
         self.blackKingLocation = (0, 4)
-        self.checkMate = False
-        self.staleMate = False
+        self.checkmate = False
+        self.stalemate = False
         self.enpassantPossible = () # coordinate of where enpessant is possible
         self.currentCastlingRights = CastleRights(True, True, True, True)
         self.castleRightsLogs = [CastleRights(self.currentCastlingRights.wks, self.currentCastlingRights.bks, 
@@ -147,12 +147,12 @@ class GameState():
             self.undoMove()
         if len(moves) == 0: # chekmate or stalemate
             if self.inCheck():
-                self.checkMate = True
+                self.checkmate = True
             else:
-                self.staleMate = True
+                self.stalemate = True
         else:
-            self.checkMate = False
-            self.staleMate = False
+            self.checkmate = False
+            self.stalemate = False
         self.enpassantPossible = tempEnpassantPossible
         self.currentCastlingRights = tempCastleRights
         return moves
@@ -352,6 +352,7 @@ class Move():
 
 # This is the driver file. It handles user input and displaying the board state 
 import pygame as p
+from pygame import color
 WIDTH = HEIGHT = 512
 DIMENSION = 8
 SQ_SIZE = HEIGHT // DIMENSION
@@ -377,6 +378,7 @@ def main():
     running = True
     sqSelected = () # keep track of user's last click
     playerClicks = [] # keep track of player clicks as two tuples [(x1,y1),(x2,y2)]
+    gameOver = False
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
@@ -384,44 +386,75 @@ def main():
             
             # mouse handler
             elif e.type == p.MOUSEBUTTONDOWN:
-                location = p.mouse.get_pos() # location of mouse
-                col = location[0]//SQ_SIZE
-                row = location[1]//SQ_SIZE
-                if sqSelected == (row, col): # the same square is clicked twice
-                    sqSelected = ()
-                    playerClicks = []
-                else:
-                    sqSelected = (row, col)
-                    playerClicks.append(sqSelected)
-                if len(playerClicks) == 2:
-                    move = Move(playerClicks[0], playerClicks[1], gs.board) 
-                    print(move.getChessNotation())
-                    for i in range(len(validMoves)):
-                        if move == validMoves[i]:
-                            gs.makeMove(validMoves[i])
-                            moveMade = True
-                            sqSelected = () # reset clicks
-                            playerClicks = []
-                    if not moveMade:
-                        playerClicks = [sqSelected]
+                if not gameOver:
+                    location = p.mouse.get_pos() # location of mouse
+                    col = location[0]//SQ_SIZE
+                    row = location[1]//SQ_SIZE
+                    if sqSelected == (row, col): # the same square is clicked twice
+                        sqSelected = ()
+                        playerClicks = []
+                    else:
+                        sqSelected = (row, col)
+                        playerClicks.append(sqSelected)
+                    if len(playerClicks) == 2:
+                        move = Move(playerClicks[0], playerClicks[1], gs.board) 
+                        print(move.getChessNotation())
+                        for i in range(len(validMoves)):
+                            if move == validMoves[i]:
+                                gs.makeMove(validMoves[i])
+                                moveMade = True
+                                sqSelected = () # reset clicks
+                                playerClicks = []
+                        if not moveMade:
+                            playerClicks = [sqSelected]
             
             # key handler
             elif e.type == p.KEYDOWN: 
                 if e.key == p.K_z: # undo a move when "z" is pressed
                     gs.undoMove()
                     moveMade = True
-        
+                if e.key == p.K_r: # reset the board when "r" is pressed
+                    gs = GameState()
+                    validMoves = gs.getValidMoves()
+                    sqSelected = ()
+                    playerClicks = []
+                    moveMade = False
         if moveMade:
             validMoves = gs.getValidMoves()
             moveMade = False
-
-        drawGameState(screen, gs)
+        drawGameState(screen, gs, validMoves, sqSelected)
+        if gs.checkmate:
+            gameOver = True
+            if gs.whiteToMove:
+                drawText(screen, "Black Checkmates!")
+            else:
+                drawText(screen, "White Checkmates!")
+        elif gs.stalemate:
+            gameOver = True
+            drawText(screen, "Stalemate!")
         clock.tick(MAX_FPS) 
         p.display.flip()
 
+# highlight selected piece and available moves
+def highlightSqaures(screen, gs, validMoves, sqSelected):
+    if sqSelected != ():
+        r, c = sqSelected
+        if gs.board[r][c][0] == ("w" if gs.whiteToMove else "b"): # check if the piece can be moved
+            # highlight piece
+            s = p.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(100) # transparency
+            s.fill(p.Color("blue"))
+            screen.blit(s, (c*SQ_SIZE, r*SQ_SIZE))
+            # highlight moves
+            s.fill(p.Color("orange"))
+            for move in validMoves:
+                if move.startRow == r and move.startCol == c:
+                    screen.blit(s, (move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
+
 # draws all the graphics in the current game state
-def drawGameState(screen, gs):
+def drawGameState(screen, gs, validMoves, sqSelected):
     drawBoard(screen) #draws the board
+    highlightSqaures(screen, gs, validMoves, sqSelected)
     drawPieces(screen, gs.board) #draws pieces on the board
 
 # draws the pieces on the board using the current GameState.board
@@ -438,6 +471,14 @@ def drawPieces(screen, board):
             piece = board[r][c]
             if piece != "--":
                 screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+def drawText(screen, text):
+    font = p.font.SysFont("Helvitca", 64, True, False)
+    textObject = font.render(text, 0, p.Color("black"))
+    textLocation = p.Rect(0, 0, WIDTH, HEIGHT).move(WIDTH/2 - textObject.get_width()/2, HEIGHT/2 - textObject.get_height()/2)
+    screen.blit(textObject, textLocation)
+    textObject = font.render(text, 0, p.Color("red"))
+    screen.blit(textObject, textLocation.move(2, 2))
 
 if __name__ == "__main__":
     main()
