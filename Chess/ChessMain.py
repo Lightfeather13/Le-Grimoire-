@@ -113,15 +113,15 @@ class GameState():
         if move.pieceCaptured == 'wR':
             if move.endRow == 7:
                 if move.endCol == 0:
-                    self.currentCastlingRight.wqs = False
+                    self.currentCastlingRights.wqs = False
                 elif move.endCol == 7:
-                    self.currentCastlingRight.wks = False
+                    self.currentCastlingRights.wks = False
         elif move.pieceCaptured == 'bR':
             if move.endRow == 0:
                 if move.endCol == 0:
-                    self.currentCastlingRight.bqs = False
+                    self.currentCastlingRights.bqs = False
                 elif move.endCol == 7:
-                    self.currentCastlingRight.bks = False
+                    self.currentCastlingRights.bks = False
 
     # valid moves with checks
     def getValidMoves(self):
@@ -353,11 +353,13 @@ class Move():
 # This is the driver file. It handles user input and displaying the board state 
 import pygame as p
 from pygame import color
+import time
 WIDTH = HEIGHT = 512
 DIMENSION = 8
 SQ_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 15
 IMAGES = {}
+open('Chess/logs.txt', 'w').close()
 
 # initialises a global dictionary of images
 def loadImages():
@@ -397,10 +399,13 @@ def main():
                         sqSelected = (row, col)
                         playerClicks.append(sqSelected)
                     if len(playerClicks) == 2:
-                        move = Move(playerClicks[0], playerClicks[1], gs.board) 
-                        print(move.getChessNotation())
+                        move = Move(playerClicks[0], playerClicks[1], gs.board)
                         for i in range(len(validMoves)):
                             if move == validMoves[i]:
+                                t = time.localtime()
+                                current_time = time.strftime("%H:%M:%S", t)
+                                with open("Chess/logs.txt", "a") as text_file:
+                                    text_file.write(current_time + " " + move.getChessNotation() + "\n")
                                 gs.makeMove(validMoves[i])
                                 moveMade = True
                                 sqSelected = () # reset clicks
